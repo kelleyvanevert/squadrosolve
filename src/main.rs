@@ -4,24 +4,27 @@ const YELLO: usize = 0;
 const XULOS: usize = 1;
 
 // color -> dir -> num
-const STEP: [[[usize; 5]; 2]; 2] = [
-    [[3, 1, 2, 1, 3], [1, 3, 2, 3, 1]],
-    [[1, 3, 2, 3, 1], [3, 1, 2, 1, 3]],
+const STEP: [[[usize; 6]; 2]; 2] = [
+    [[0, 3, 1, 2, 1, 3], [0, 1, 3, 2, 3, 1]],
+    [[0, 1, 3, 2, 3, 1], [0, 3, 1, 2, 1, 3]],
 ];
 
 const NUMS: [&'static str; 4] = ["0", "1", "2", "3"];
+const COLORS: [&'static str; 2] = ["Yellow", "Xulos"];
+
+const DEBUG: bool = false;
 
 /*     X U L O S
 
-    ┌ ─ 1 3 2 3 1 ─ ┐
-Y   | . v v v v v . |
-E   3 >           . 1
-L   1 >           . 3
-L   2 >           . 2
-O   1 >           . 3
-W   3 >           . 1
-    | . . . . . . . |
-    └ ─ 3 1 2 1 3 ─ ┘
+    ┌  ─  1  3  2  3  1 ─ ┐
+Y   |  . x1 x2 x3 x4 x5 . |
+E   3 y1                . 1
+L   1 y2                . 3
+L   2 y3                . 2
+O   1 y4                . 3
+W   3 y5                . 1
+    |  .  .  .  .  .  . . |
+    └  ─  3  1  2  1  3 ─ ┘
 
 */
 
@@ -29,8 +32,8 @@ W   3 >           . 1
 struct State {
     depth: usize,
     turn: usize,
-    step: [[usize; 5]; 2],
-    dir: [[usize; 5]; 2], // 0 going to, 1 going back
+    at: [[usize; 6]; 2],
+    dir: [[usize; 6]; 2], // 0 going to, 1 going back
 }
 
 impl FromStr for State {
@@ -50,36 +53,32 @@ impl FromStr for State {
 
         let mut state = State::initial();
 
-        for y in 0..5 {
-            let dir = if (1..=7).any(|x| grid[y + 2][x] == '>') {
+        for y in 1..=5 {
+            let dir = if (1..=7).any(|x| grid[y + 1][x] == '>') {
                 0
             } else {
                 1
             };
-            let mut step = (1..=7)
-                .position(|x| grid[y + 2][x] == if dir == 0 { '>' } else { '<' })
+            let step = (1..=7)
+                .position(|x| grid[y + 1][x] == if dir == 0 { '>' } else { '<' })
                 .unwrap();
-            if dir == 1 {
-                step = 6 - step;
-            }
+
             state.dir[YELLO][y] = dir;
-            state.step[YELLO][y] = step;
+            state.at[YELLO][y] = step;
         }
 
-        for x in 0..5 {
-            let dir = if (1..=7).any(|y| grid[y][x + 2] == 'v') {
+        for x in 1..=5 {
+            let dir = if (1..=7).any(|y| grid[y][x + 1] == 'v') {
                 0
             } else {
                 1
             };
-            let mut step = (1..=7)
-                .position(|y| grid[y][x + 2] == if dir == 0 { 'v' } else { '^' })
+            let step = (1..=7)
+                .position(|y| grid[y][x + 1] == if dir == 0 { 'v' } else { '^' })
                 .unwrap();
-            if dir == 1 {
-                step = 6 - step;
-            }
+
             state.dir[XULOS][x] = dir;
-            state.step[XULOS][x] = step;
+            state.at[XULOS][x] = step;
         }
 
         Ok(state)
@@ -91,19 +90,19 @@ impl State {
         State {
             depth: 0,
             turn: YELLO,
-            step: [[0; 5]; 2],
-            dir: [[0; 5]; 2],
+            at: [[0; 6]; 2],
+            dir: [[0; 6]; 2],
         }
     }
 
     fn heuristic_for_color(&self, color: usize) -> i32 {
-        (0..5)
+        (1..=5)
             .map(|i| {
                 if self.dir[color][i] == 1 {
                     // going back
-                    2 + self.step[color][i] as i32
+                    6 + 6 - self.at[color][i] as i32
                 } else {
-                    self.step[color][i] as i32
+                    self.at[color][i] as i32
                 }
             })
             .sum()
@@ -113,82 +112,89 @@ impl State {
         self.heuristic_for_color(YELLO) - self.heuristic_for_color(XULOS)
     }
 
-    // fn xypos(&self, color: usize, i: usize) -> [usize; 2] {
-    //     let mut pos = [0, 0]; // [x, y]
-    //     if self.dir[color][i] == 0 {
-    //         pos[color] = self.step[color][i];
-    //     } else {
-    //         pos[color] = 6 - self.step[color][i];
-    //     }
-    //     pos[1 - color] = i + 1;
-    //     pos
-    // }
-
-    fn at(&self, color: usize, i: usize) -> usize {
-        if self.dir[color][i - 1] == 0 {
-            self.step[color][i - 1]
-        } else {
-            6 - self.step[color][i - 1]
-        }
-    }
-
     fn next(&self) -> Vec<(usize, Self)> {
         let mut possible = vec![];
 
         let color = self.turn;
 
-        for i in 0..5 {
-            // println!(
-            //     "Moving stone {i} of {}",
-            //     if color == 0 { "yellow" } else { "xulos" }
-            // );
+        for i in 1..=5 {
+            if DEBUG {
+                println!("Moving stone {i} of {}", COLORS[color]);
+            }
 
-            if self.step[color][i] >= 6 && self.dir[color][i] >= 1 {
+            if self.at[color][i] == 0 && self.dir[color][i] == 1 {
                 // noop, this one's done
+                if DEBUG {
+                    println!("  - already done");
+                }
                 continue;
             }
 
             let mut s = self.clone();
 
-            let j_target = (s.step[color][i] + STEP[color][s.dir[color][i]][i]).min(6);
+            let j_curr = s.at[color][i];
+            let dir = s.dir[color][i];
+            let step_by = STEP[color][dir][i];
+            let j_target = if dir == 0 {
+                (j_curr + step_by).min(6)
+            } else {
+                j_curr.saturating_sub(step_by)
+            };
 
-            // println!(
-            //     "  at: {}, move by {}, target: {}",
-            //     s.step[color][i], STEP[color][s.dir[color][i]][i], j_target
-            // );
+            if DEBUG {
+                println!(
+                    "  at {} going {}, step by {}, target: {}",
+                    j_curr, dir, step_by, j_target
+                );
+            }
 
-            let mut j = s.step[color][i] + 1;
+            let mut j = if dir == 0 {
+                j_curr + 1
+            } else {
+                j_curr.saturating_sub(1)
+            };
             let mut hit = false;
             loop {
-                // println!("    {}", j);
+                if DEBUG {
+                    println!("    {}", j);
+                }
 
-                // if self.at(1 - color, j) == i + 1 {
-                if j < 5 && self.at(1 - color, j) == i + 1 {
-                    // println!("      hit");
+                if j > 0 && j < 6 && self.at[1 - color][j] == i {
+                    if DEBUG {
+                        println!("      hit {:?}", self.at[1 - color]);
+                    }
                     hit = true;
-                    s.step[1 - color][j - 1] = 0; // place back to start (of dir)
+
+                    // place back
+                    if s.dir[1 - color][j] == 0 {
+                        s.at[1 - color][j] = 0;
+                    } else {
+                        s.at[1 - color][j] = 6;
+                    }
                 }
 
                 if !hit && j == j_target {
                     break;
-                } else if hit && (j == 6 || self.at(1 - color, j) != i + 1) {
+                } else if j == 0 || j == 6 {
                     break;
-                } else if j == 6 {
+                } else if hit && self.at[1 - color][j] != i {
                     break;
                 }
 
-                j += 1;
+                j = if dir == 0 { j + 1 } else { j.saturating_sub(1) };
             }
 
-            s.step[color][i] = j;
+            s.at[color][i] = j;
 
-            if s.dir[color][i] == 0 && s.step[color][i] >= 6 {
+            if s.dir[color][i] == 0 && s.at[color][i] == 6 {
                 s.dir[color][i] = 1;
-                s.step[color][i] = 0;
             }
 
             s.depth += 1;
             s.turn = 1 - s.turn;
+            if DEBUG {
+                s.viz(self.depth);
+            }
             possible.push((i, s));
         }
 
@@ -196,7 +202,7 @@ impl State {
     }
 
     fn completed(&self) -> bool {
-        self.dir[self.turn].iter().all(|&d| d == 1) && self.step[self.turn].iter().all(|&s| s >= 6)
+        self.dir[self.turn].iter().all(|&d| d == 1) && self.at[self.turn].iter().all(|&i| i == 0)
     }
 
     fn minimax(&self, depth: usize, maximize: bool) -> (Vec<State>, State) {
@@ -211,10 +217,9 @@ impl State {
                     moves.push(s);
                     (moves, worst_they_can_do)
                 })
-                .max_by_key(|s| s.1.heuristic())
-                .unwrap();
+                .max_by_key(|s| s.1.heuristic());
 
-            best_move_for_me
+            best_move_for_me.unwrap()
         } else {
             let best_move_for_them = self
                 .next()
@@ -224,52 +229,48 @@ impl State {
                     moves.push(s);
                     (moves, best_i_can_do)
                 })
-                .min_by_key(|s| s.1.heuristic())
-                .unwrap();
+                .min_by_key(|s| s.1.heuristic());
 
-            best_move_for_them
+            if best_move_for_them.is_none() {
+                println!("O NOO! Opponent has a winning strategy!");
+                return (vec![], self.clone());
+            }
+
+            best_move_for_them.unwrap()
         }
     }
 
     fn viz(&self, indent: usize) {
         let mut grid = vec![
             vec!["/", "-", "-", "-", "-", "-", "-", "-", "\\"],
-            vec!["|", ".", ".", ".", ".", ".", ".", ".", "|"],
+            vec!["|", " ", ".", ".", ".", ".", ".", " ", "|"],
             vec!["|", ".", " ", " ", " ", " ", " ", ".", "|"],
             vec!["|", ".", " ", " ", " ", " ", " ", ".", "|"],
             vec!["|", ".", " ", " ", " ", " ", " ", ".", "|"],
             vec!["|", ".", " ", " ", " ", " ", " ", ".", "|"],
             vec!["|", ".", " ", " ", " ", " ", " ", ".", "|"],
-            vec!["|", ".", ".", ".", ".", ".", ".", ".", "|"],
+            vec!["|", " ", ".", ".", ".", ".", ".", " ", "|"],
             vec!["\\", "-", "-", "-", "-", "-", "-", "-", "/"],
         ];
 
-        for i in 0..5 {
+        for i in 1..=5 {
             // yellow n's
-            grid[i + 2][0] = NUMS[STEP[YELLO][0][i]]; // to
-            grid[i + 2][8] = NUMS[STEP[YELLO][1][i]]; // back
+            grid[i + 1][0] = NUMS[STEP[YELLO][0][i]]; // to
+            grid[i + 1][8] = NUMS[STEP[YELLO][1][i]]; // back
 
             // xulos n's
-            grid[0][i + 2] = NUMS[STEP[XULOS][0][i]]; // to
-            grid[8][i + 2] = NUMS[STEP[XULOS][1][i]]; // back
+            grid[0][i + 1] = NUMS[STEP[XULOS][0][i]]; // to
+            grid[8][i + 1] = NUMS[STEP[XULOS][1][i]]; // back
 
             // yellow
             let c = if self.dir[YELLO][i] == 0 { ">" } else { "<" };
-            let x = if self.dir[YELLO][i] == 0 {
-                self.step[YELLO][i]
-            } else {
-                6 - self.step[YELLO][i]
-            };
-            grid[i + 2][x + 1] = c;
+            let x = self.at[YELLO][i];
+            grid[i + 1][x + 1] = c;
 
             // xulos
             let c = if self.dir[XULOS][i] == 0 { "v" } else { "^" };
-            let y = if self.dir[XULOS][i] == 0 {
-                self.step[XULOS][i]
-            } else {
-                6 - self.step[XULOS][i]
-            };
-            grid[y + 1][i + 2] = c;
+            let y = self.at[XULOS][i];
+            grid[y + 1][i + 1] = c;
         }
 
         let s = grid
@@ -304,15 +305,14 @@ where
 }
 
 fn main() {
-    let (initial_state, read_from_file) = fs::read_to_string("./input.txt")
-        .ok()
-        .and_then(|s| (&s[0..]).parse().ok().map(|s| (s, true)))
-        .unwrap_or((State::initial(), false));
+    let initial_state = fs::read_to_string("./input.txt")
+        .unwrap()
+        .parse::<State>()
+        .unwrap();
 
-    println!(
-        "Initial state{}:",
-        if read_from_file { " (FROM FILE)" } else { "" }
-    );
+    let initial_state = State::initial();
+
+    println!("Initial state:",);
     println!("========");
     initial_state.viz(0);
 
@@ -320,10 +320,8 @@ fn main() {
 
     time(|| {
         let num_steps = 10;
-        let (moves, last_state) = initial_state.minimax(num_steps, true);
+        let (moves, _) = initial_state.minimax(num_steps, true);
         println!("Best move for me, looking {num_steps} steps ahead:");
-        last_state.viz(0);
-        println!("For moves:");
         for (k, s) in moves.iter().rev().enumerate() {
             s.viz(k);
         }
