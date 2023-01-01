@@ -6,3 +6,9 @@ How to use:
 
 - Input the current state of the board in `input.txt`
 - Run `cargo run --release` to see what yellow should play next :)
+
+Pics of the computer killing it:
+
+![](./gameplay_1.jpg)
+
+![](./gameplay_2.jpg)
