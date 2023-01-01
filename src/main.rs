@@ -311,7 +311,7 @@ fn main() {
         .unwrap();
     // .with_turn(XULOS);
 
-    // let initial_state = State::initial();
+    let initial_state = State::initial();
 
     println!("Initial state:",);
     println!("========");
