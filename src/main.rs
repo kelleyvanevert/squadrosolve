@@ -95,6 +95,11 @@ impl State {
         }
     }
 
+    fn with_turn(mut self, turn: usize) -> Self {
+        self.turn = turn;
+        self
+    }
+
     fn heuristic_for_color(&self, color: usize) -> i32 {
         (1..=5)
             .map(|i| {
@@ -202,7 +207,7 @@ impl State {
     }
 
     fn completed(&self) -> bool {
-        self.dir[self.turn].iter().all(|&d| d == 1) && self.at[self.turn].iter().all(|&i| i == 0)
+        (1..=5).all(|i| self.dir[self.turn][i] == 1 && self.at[self.turn][i] == 0)
     }
 
     fn minimax(&self, depth: usize, maximize: bool) -> (Vec<State>, State) {
@@ -230,11 +235,6 @@ impl State {
                     (moves, best_i_can_do)
                 })
                 .min_by_key(|s| s.1.heuristic());
-
-            if best_move_for_them.is_none() {
-                println!("O NOO! Opponent has a winning strategy!");
-                return (vec![], self.clone());
-            }
 
             best_move_for_them.unwrap()
         }
@@ -309,14 +309,13 @@ fn main() {
         .unwrap()
         .parse::<State>()
         .unwrap();
+    // .with_turn(XULOS);
 
-    let initial_state = State::initial();
+    // let initial_state = State::initial();
 
     println!("Initial state:",);
     println!("========");
     initial_state.viz(0);
-
-    // FOURTH ATTEMPT
 
     time(|| {
         let num_steps = 10;
@@ -326,135 +325,4 @@ fn main() {
             s.viz(k);
         }
     });
-
-    // // THIRD ATTEMPT
-
-    // let best_move = initial_state
-    //     .next()
-    //     .into_iter()
-    //     .max_by_key(|initial_state| {
-    //         let mut consider = vec![initial_state.clone()];
-
-    //         for i in 0..5 {
-    //             println!();
-    //             println!("Step {i}");
-
-    //             println!("Adding all possible opponent's moves...");
-    //             consider = consider.into_iter().flat_map(|s| s.next()).collect();
-    //             println!("  now considering {}", consider.len());
-
-    //             println!("Finding N best moves...");
-    //             let mut beam = MinMaxHeap::new();
-    //             for state in consider {
-    //                 for next_state in state.next() {
-    //                     let h = next_state.heuristic();
-
-    //                     if beam.len() < MAX_BEAM_WIDTH {
-    //                         beam.push(next_state);
-    //                     } else if h < beam.peek_min().unwrap().heuristic() {
-    //                         // not any good
-    //                     } else {
-    //                         beam.replace_min(next_state);
-    //                     }
-    //                 }
-    //             }
-    //             println!(
-    //                 "  now considering {}, worst: {}, best: {}",
-    //                 beam.len(),
-    //                 beam.peek_min().unwrap().heuristic(),
-    //                 beam.peek_max().unwrap().heuristic()
-    //             );
-
-    //             println!("Best:");
-    //             beam.peek_max().unwrap().viz(0);
-
-    //             consider = beam.into_vec();
-    //         }
-    //     });
-
-    // println!();
-    // println!("Best first move:");
-    // if let Some(s) = best_move {
-    //     s.viz(0);
-    // } else {
-    //     println!("NOT FOUND");
-    // }
-
-    // // SECOND ATTEMPT
-
-    // let mut consider = vec![initial_state];
-    // // let mut beam = MinMaxHeap::new();
-    // // beam.push(initial_state);
-
-    // for i in 0..5 {
-    //     println!();
-    //     println!("Step {i}");
-
-    //     // find best moves
-    //     println!("Finding best moves...");
-    //     let mut beam = MinMaxHeap::new();
-    //     for state in consider {
-    //         for next_state in state.next() {
-    //             let h = next_state.heuristic();
-
-    //             if beam.len() < MAX_BEAM_WIDTH {
-    //                 beam.push(next_state);
-    //             } else if h < beam.peek_min().unwrap().heuristic() {
-    //                 // not any good
-    //             } else {
-    //                 beam.replace_min(next_state);
-    //             }
-    //         }
-    //     }
-    //     println!(
-    //         "  now considering {}, worst: {}, best: {}",
-    //         beam.len(),
-    //         beam.peek_min().unwrap().heuristic(),
-    //         beam.peek_max().unwrap().heuristic()
-    //     );
-
-    //     println!("Best:");
-    //     beam.peek_max().unwrap().viz(0);
-
-    //     println!("Adding all possible opponent's moves...");
-    //     consider = beam.into_iter().flat_map(|s| s.next()).collect();
-    //     println!("  now considering {}", consider.len(),);
-    // }
-
-    // // FIRST ATTEMPT
-
-    // let mut beam = MinMaxHeap::new();
-    // beam.push(initial_state.heuristic());
-
-    // let mut considering = vec![initial_state];
-    // println!("Start with:");
-    // considering[0].viz(0);
-
-    // for i in 0.. {
-    //     println!();
-    //     println!("Step {i}");
-    //     considering = min_step(&mut beam, considering);
-    //     if let Some(state) = considering.iter().min_by_key(|s| s.heuristic()) {
-    //         println!("Opponent's best move:");
-    //         state.viz(0);
-    //     }
-
-    //     considering = max_step(&mut beam, considering);
-    //     if let Some(state) = considering.iter().min_by_key(|s| s.heuristic()) {
-    //         println!("My best move:");
-    //         state.viz(0);
-    //     }
-
-    //     println!(
-    //         "\nNow considering {}, beam width {} ({} thru {})",
-    //         considering.len(),
-    //         beam.len(),
-    //         beam.peek_min().unwrap(),
-    //         beam.peek_max().unwrap()
-    //     );
-
-    //     if considering.len() == 0 {
-    //         break;
-    //     }
-    // }
 }
