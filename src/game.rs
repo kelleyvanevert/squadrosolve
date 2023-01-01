@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-const YELLO: usize = 0;
-const XULOS: usize = 1;
+pub const YELLO: usize = 0;
+pub const XULOS: usize = 1;
 
 // color -> dir -> num
 const STEP: [[[usize; 6]; 2]; 2] = [
@@ -9,10 +9,10 @@ const STEP: [[[usize; 6]; 2]; 2] = [
     [[0, 1, 3, 2, 3, 1], [0, 3, 1, 2, 1, 3]],
 ];
 
-const NUMS: [&'static str; 4] = ["0", "1", "2", "3"];
-const COLORS: [&'static str; 2] = ["Yellow", "Xulos"];
+pub const NUMS: [&'static str; 4] = ["0", "1", "2", "3"];
+pub const COLORS: [&'static str; 2] = ["Yellow", "Xulos"];
 
-const DEBUG: bool = false;
+pub const DEBUG: bool = false;
 
 /*     X U L O S
 
@@ -95,26 +95,10 @@ impl State {
         }
     }
 
+    #[allow(unused)]
     pub fn with_turn(mut self, turn: usize) -> Self {
         self.turn = turn;
         self
-    }
-
-    fn heuristic_for_color(&self, color: usize) -> i32 {
-        (1..=5)
-            .map(|i| {
-                if self.dir[color][i] == 1 {
-                    // going back
-                    6 + 6 - self.at[color][i] as i32
-                } else {
-                    self.at[color][i] as i32
-                }
-            })
-            .sum()
-    }
-
-    pub fn heuristic(&self) -> i32 {
-        self.heuristic_for_color(YELLO) - self.heuristic_for_color(XULOS)
     }
 
     pub fn next(&self) -> Vec<(usize, Self)> {
@@ -210,7 +194,12 @@ impl State {
         (1..=5).all(|i| self.dir[self.turn][i] == 1 && self.at[self.turn][i] == 0)
     }
 
-    pub fn minimax(&self, depth: usize, maximize: bool) -> (Vec<State>, State) {
+    pub fn minimax(
+        &self,
+        depth: usize,
+        maximize: bool,
+        heuristic: fn(&State) -> i32,
+    ) -> (Vec<State>, State) {
         if depth == 0 || self.completed() {
             (vec![], self.clone())
         } else if maximize {
@@ -218,11 +207,11 @@ impl State {
                 .next()
                 .into_iter()
                 .map(|(_, s)| {
-                    let (mut moves, worst_they_can_do) = s.minimax(depth - 1, !maximize);
+                    let (mut moves, worst_they_can_do) = s.minimax(depth - 1, !maximize, heuristic);
                     moves.push(s);
                     (moves, worst_they_can_do)
                 })
-                .max_by_key(|s| s.1.heuristic());
+                .max_by_key(|s| heuristic(&s.1));
 
             best_move_for_me.unwrap()
         } else {
@@ -230,11 +219,11 @@ impl State {
                 .next()
                 .into_iter()
                 .map(|(_, s)| {
-                    let (mut moves, best_i_can_do) = s.minimax(depth - 1, !maximize);
+                    let (mut moves, best_i_can_do) = s.minimax(depth - 1, !maximize, heuristic);
                     moves.push(s);
                     (moves, best_i_can_do)
                 })
-                .min_by_key(|s| s.1.heuristic());
+                .min_by_key(|s| heuristic(&s.1));
 
             best_move_for_them.unwrap()
         }
@@ -283,14 +272,42 @@ impl State {
     }
 }
 
-impl PartialOrd for State {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
+pub fn distance_heuristic(state: &State) -> i32 {
+    let distance_travelled = [0, 1].map(|color| {
+        (1..=5)
+            .map(|i| {
+                if state.dir[color][i] == 1 {
+                    // going back
+                    6 + 6 - state.at[color][i] as i32
+                } else {
+                    state.at[color][i] as i32
+                }
+            })
+            .sum::<i32>()
+    });
+
+    distance_travelled[YELLO] - distance_travelled[XULOS]
 }
 
-impl Ord for State {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.heuristic().cmp(&other.heuristic())
-    }
+/// Looks more reasonable, but seems to work a bit less good than the distance heuristic
+pub fn steps_to_go_heuristic(state: &State) -> i32 {
+    let steps_to_go = [0, 1].map(|color| {
+        (1..=5)
+            .map(|i| {
+                if state.dir[color][i] == 1 {
+                    let step_by = STEP[color][1][i] as i32;
+                    (state.at[color][i] as i32).div_ceil(step_by)
+                } else {
+                    let step_by = STEP[color][0][i] as i32;
+                    (6 - state.at[color][i] as i32).div_ceil(step_by) + 6_i32.div_ceil(step_by)
+                }
+            })
+            .sum::<i32>()
+    });
+
+    steps_to_go[XULOS] - steps_to_go[YELLO]
+}
+
+pub fn null_heuristic(_state: &State) -> i32 {
+    0
 }

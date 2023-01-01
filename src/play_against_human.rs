@@ -1,15 +1,10 @@
-use crate::game::State;
-use std::{fs, time::Instant};
+use crate::{
+    game::{distance_heuristic, State},
+    util::time,
+};
+use std::fs;
 
-fn time<F>(mut f: F)
-where
-    F: FnMut(),
-{
-    let t0 = Instant::now();
-    f();
-    println!("  took {:?}", t0.elapsed());
-}
-
+#[allow(unused)]
 pub fn play_against_human() {
     let initial_state = fs::read_to_string("./input.txt")
         .unwrap()
@@ -17,7 +12,7 @@ pub fn play_against_human() {
         .unwrap();
     // .with_turn(XULOS);
 
-    let initial_state = State::initial();
+    // let initial_state = State::initial();
 
     println!("Initial state:",);
     println!("========");
@@ -25,7 +20,7 @@ pub fn play_against_human() {
 
     time(|| {
         let num_steps = 10;
-        let (moves, _) = initial_state.minimax(num_steps, true);
+        let (moves, _) = initial_state.minimax(num_steps, true, |state| distance_heuristic(&state));
         println!("Best move for me, looking {num_steps} steps ahead:");
         for (k, s) in moves.iter().rev().enumerate() {
             s.viz(k);
