@@ -1,10 +1,11 @@
-use std::str::FromStr;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use std::{collections::HashSet, str::FromStr};
 
 pub const YELLO: usize = 0;
 pub const XULOS: usize = 1;
 
 // color -> dir -> num
-const STEP: [[[usize; 6]; 2]; 2] = [
+pub const STEP: [[[usize; 6]; 2]; 2] = [
     [[0, 3, 1, 2, 1, 3], [0, 1, 3, 2, 3, 1]],
     [[0, 1, 3, 2, 3, 1], [0, 3, 1, 2, 1, 3]],
 ];
@@ -32,6 +33,7 @@ W   3 y5                . 1
 pub struct State {
     pub depth: usize,
     pub turn: usize,
+    pub points: [usize; 2],
     pub at: [[usize; 6]; 2],
     pub dir: [[usize; 6]; 2], // 0 going to, 1 going back
 }
@@ -90,6 +92,7 @@ impl State {
         State {
             depth: 0,
             turn: YELLO,
+            points: [0; 2],
             at: [[0; 6]; 2],
             dir: [[0; 6]; 2],
         }
@@ -101,8 +104,8 @@ impl State {
         self
     }
 
-    pub fn next(&self) -> Vec<(usize, Self)> {
-        let mut possible = vec![];
+    pub fn next(&self) -> HashSet<(usize, Self)> {
+        let mut possible = HashSet::new();
 
         let color = self.turn;
 
@@ -155,6 +158,7 @@ impl State {
                     hit = true;
 
                     // place back
+                    s.points[color] += 1;
                     if s.dir[1 - color][j] == 0 {
                         s.at[1 - color][j] = 0;
                     } else {
@@ -184,7 +188,7 @@ impl State {
             if DEBUG {
                 s.viz(self.depth);
             }
-            possible.push((i, s));
+            possible.insert((i, s));
         }
 
         possible
@@ -192,6 +196,21 @@ impl State {
 
     pub fn completed(&self) -> bool {
         (1..=5).all(|i| self.dir[self.turn][i] == 1 && self.at[self.turn][i] == 0)
+    }
+
+    pub fn is_win(&self) -> bool {
+        // kinda
+        (1..=5).all(|i| self.dir[YELLO][i] == 1 && self.at[YELLO][i] == 0)
+    }
+
+    pub fn win_factor(&self) -> i32 {
+        let num_stones_done = [0, 1].map(|color| {
+            (1usize..=5)
+                .filter(|&i| self.dir[color][i] == 1 && self.at[color][i] == 0)
+                .count() as i32
+        });
+
+        num_stones_done[0] - num_stones_done[1]
     }
 
     pub fn minimax(
@@ -205,7 +224,7 @@ impl State {
         } else if maximize {
             let best_move_for_me = self
                 .next()
-                .into_iter()
+                .into_par_iter()
                 .map(|(_, s)| {
                     let (mut moves, worst_they_can_do) = s.minimax(depth - 1, !maximize, heuristic);
                     moves.push(s);
@@ -217,7 +236,7 @@ impl State {
         } else {
             let best_move_for_them = self
                 .next()
-                .into_iter()
+                .into_par_iter()
                 .map(|(_, s)| {
                     let (mut moves, best_i_can_do) = s.minimax(depth - 1, !maximize, heuristic);
                     moves.push(s);
@@ -272,24 +291,7 @@ impl State {
     }
 }
 
-pub fn distance_heuristic(state: &State) -> i32 {
-    let distance_travelled = [0, 1].map(|color| {
-        (1..=5)
-            .map(|i| {
-                if state.dir[color][i] == 1 {
-                    // going back
-                    6 + 6 - state.at[color][i] as i32
-                } else {
-                    state.at[color][i] as i32
-                }
-            })
-            .sum::<i32>()
-    });
-
-    distance_travelled[YELLO] - distance_travelled[XULOS]
-}
-
-/// Looks more reasonable, but seems to work a bit less good than the distance heuristic
+/// Score: best
 pub fn steps_to_go_heuristic(state: &State) -> i32 {
     let steps_to_go = [0, 1].map(|color| {
         (1..=5)
@@ -308,6 +310,30 @@ pub fn steps_to_go_heuristic(state: &State) -> i32 {
     steps_to_go[XULOS] - steps_to_go[YELLO]
 }
 
+/// Score: also quite good
+pub fn distance_heuristic(state: &State) -> i32 {
+    let distance_travelled = [0, 1].map(|color| {
+        (1..=5)
+            .map(|i| {
+                if state.dir[color][i] == 1 {
+                    // going back
+                    6 + 6 - state.at[color][i] as i32
+                } else {
+                    state.at[color][i] as i32
+                }
+            })
+            .sum::<i32>()
+    });
+
+    distance_travelled[YELLO] - distance_travelled[XULOS]
+}
+
+/// Score: you're a bully, actually quite effective
+pub fn bully_heuristic(state: &State) -> i32 {
+    state.points[0] as i32
+}
+
+/// Score: do you know the rules of the game? 🧐
 pub fn null_heuristic(_state: &State) -> i32 {
     0
 }
