@@ -1,5 +1,5 @@
 use crate::{
-    game::{distance_heuristic, State},
+    game::{steps_to_go_heuristic, State},
     util::time,
 };
 use std::fs;
@@ -20,7 +20,9 @@ pub fn play_against_human() {
 
     time(|| {
         let num_steps = 10;
-        let (moves, _) = initial_state.minimax(num_steps, true, |state| distance_heuristic(&state));
+        let (moves, _) =
+            initial_state.minimax(num_steps, true, |state| steps_to_go_heuristic(&state));
+
         println!("Best move for me, looking {num_steps} steps ahead:");
         for (k, s) in moves.iter().rev().enumerate() {
             s.viz(k);
